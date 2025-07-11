@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DSA Structure Visualizer</title>
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-dark: #1e40af;
+      --light: #f8fafc;
+      --gray: #e2e8f0;
+      --text: #0f172a;
+      --accent: #10b981;
+      --highlight: #f59e0b;
+    }
+    body.dark {
+      --blue: #1d4ed8;
+      --blue-dark: #172554;
+      --light: #0f172a;
+      --gray: #334155;
+      --text: #f1f5f9;
+      --accent: #059669;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:'Segoe UI',sans-serif;
+      background:linear-gradient(to right,var(--light),#dbeafe);
+      color:var(--text);
+      min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem;transition:background 0.4s ease;
+    }
+    h1{color:var(--blue-dark);font-size:2rem;margin-bottom:1.5rem;text-align:center}
+    .controls{background:var(--light);padding:1rem 1.5rem;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.08);display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;margin-bottom:1rem}
+    select,input,button{padding:0.6rem 1.2rem;font-size:1rem;border:1px solid var(--gray);border-radius:8px;transition:all 0.2s}
+    input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,0.2)}
+    button{background:var(--blue);color:#fff;border:none;font-weight:500;cursor:pointer}
+    button:hover{background:var(--blue-dark)}
+    #message{min-height:24px;font-weight:600;color:var(--highlight);margin-bottom:1rem;opacity:0;transform:translateY(-10px);transition:opacity .5s,transform .5s}
+    #message.show{opacity:1;transform:translateY(0)}
+    #container{width:100%;max-width:1000px;display:flex;justify-content:center}
+    #visual{position:relative;display:flex;flex-wrap:wrap;gap:1.2rem;align-items:center;justify-content:center;min-height:160px;width:100%}
+    .node{position:relative;display:flex;align-items:center;justify-content:center;padding:0.6rem 1.4rem;border-radius:50%;background:var(--accent);color:#fff;font-weight:500;box-shadow:0 2px 8px rgba(16,185,129,0.3);opacity:0;animation:fade .4s forwards;user-select:none;cursor:pointer}
+    .node.rect{border-radius:8px;}
+    @keyframes fade{to{opacity:1}}
+    .arrow-right::after{content:'→';font-size:1.4rem;margin-left:0.5rem;color:var(--blue-dark)}
+    .arrow-left::before{content:'←';font-size:1.4rem;margin-right:0.5rem;color:var(--blue-dark)}
+    .circle-arrow::after{content:'↻';font-size:1.4rem;margin-left:0.5rem;color:#facc15}
+    .stack-column{flex-direction:column-reverse;gap:0.6rem}
+    .tree-row{display:flex;justify-content:center;gap:1rem;margin-bottom:1rem}
+    .highlight{background:var(--highlight)!important;box-shadow:0 0 10px var(--highlight)}
+    svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+  </style>
+</head>
+<body>
+  <h1>🧩 DSA Structure & Graph Visualizer</h1>
+  <div class="controls">
+    <select id="structure">
+      <option value="linked">Linked List</option>
+      <option value="stack">Stack</option>
+      <option value="queue">Queue</option>
+      <option value="tree">Binary Tree</option>
+      <option value="graph">Graph</option>
+    </select>
+    <select id="listType" style="display:block;">
+      <option value="singly">Singly</option>
+      <option value="doubly">Doubly</option>
+      <option value="circular">Circular</option>
+    </select>
+    <input type="text" id="dataInput" placeholder="Enter the value" />
+    <button onclick="insertItem()">Insert/push/enqueue</button>
+    <button onclick="deleteItem()">Delete/pop/dequeue</button>
+    <button onclick="resetStructure()">Reset</button>
+    <input type="text" id="searchInput" placeholder="Search value" />
+    <button onclick="searchItem()">Search</button>
+    <button onclick="toggleConnectMode()" id="connectBtn">🔗 Connect Mode</button>
+    <button id="darkToggle" onclick="toggleDark()">🌙/☀️</button>
+  </div>
+  <div id="message"></div>
+  <div id="container"><div id="visual"></div></div>
+
+  <script>
+    let data=[];            // generic list / vertices
+    let edges=[];           // graph edges [{from,to}]
+    let connectMode=false;
+    let selectedForEdge=[];
+
+    const structureSelect=document.getElementById('structure');
+    const listTypeSelect=document.getElementById('listType');
+    const visualDiv=document.getElementById('visual');
+    const darkToggle=document.getElementById('darkToggle');
+    const messageDiv=document.getElementById('message');
+    const connectBtn=document.getElementById('connectBtn');
+
+    structureSelect.addEventListener('change',()=>{
+      listTypeSelect.style.display=structureSelect.value==='linked'?'block':'none';
+      connectMode=false;selectedForEdge=[];connectBtn.classList.remove('highlight');
+      resetStructure();
+    });
+
+    function showMsg(txt){messageDiv.textContent=txt;messageDiv.classList.add('show');setTimeout(()=>messageDiv.classList.remove('show'),2500);}
+
+    function toggleConnectMode(){if(structureSelect.value!=='graph'){showMsg('Connect mode only works in Graph');return;}connectMode=!connectMode;selectedForEdge=[];connectBtn.classList.toggle('highlight',connectMode);showMsg(connectMode?'Connect mode ON':'Connect mode OFF');}
+
+    function insertItem(){const v=document.getElementById('dataInput').value.trim();if(!v) return;
+      if(structureSelect.value==='graph'){
+        if(v.includes(',')){
+          const [u,w]=v.split(',').map(s=>s.trim());if(u&&w){if(!data.includes(u))data.push(u);if(!data.includes(w))data.push(w);edges.push({from:u,to:w});}
+        }else{if(!data.includes(v))data.push(v);}  // add vertex
+      }else{
+        data.push(v);
+      }
+      document.getElementById('dataInput').value='';render();}
+
+    function deleteItem(){if(structureSelect.value==='graph'){
+        if(edges.length) edges.pop(); else data.pop();
+      }else if(data.length){structureSelect.value==='queue'?data.shift():data.pop();}
+      render();}
+
+    function resetStructure(){data=[];edges=[];render();}
+
+    function render(){visualDiv.className='';visualDiv.innerHTML='';if(structureSelect.value==='graph'){renderGraph();return;}
+      switch(structureSelect.value){case'linked':renderLinked();break;case'stack':renderStack();break;case'queue':renderQueue();break;default:renderTree();}}
+
+    function renderLinked(){const mode=listTypeSelect.value;data.forEach((val,i)=>{const div=document.createElement('div');div.className='node rect';if(mode==='singly'){if(i!==data.length-1)div.classList.add('arrow-right');}else if(mode==='doubly'){div.classList.add('arrow-right','arrow-left');if(i===0)div.classList.remove('arrow-left');if(i===data.length-1)div.classList.remove('arrow-right');}else{div.classList.add('circle-arrow');}div.textContent=val;visualDiv.appendChild(div);});}
+
+    function renderStack(){visualDiv.classList.add('stack-column');data.forEach((val,i)=>{const div=document.createElement('div');div.className='node rect';div.textContent=val+(i===data.length-1?' (top)':'');visualDiv.appendChild(div);});}
+
+    function renderQueue(){data.forEach((val,i)=>{const div=document.createElement('div');div.className='node rect';if(i!==data.length-1)div.classList.add('arrow-right');div.textContent=val;visualDiv.appendChild(div);});}
+
+    function renderTree(){const rows=Math.ceil(Math.log2(data.length+1));let idx=0;for(let r=0;r<rows;r++){const row=document.createElement('div');row.className='tree-row';const nodes=Math.pow(2,r);for(let n=0;n<nodes&&idx<data.length;n++){const node=document.createElement('div');node.className='node rect';node.textContent=data[idx++];row.appendChild(node);}visualDiv.appendChild(row);} }
+
+    /* ------------- GRAPH -------------- */
+    function renderGraph(){
+      const diameter=440;visualDiv.style.width=diameter+'px';visualDiv.style.height=diameter+'px';visualDiv.innerHTML='';
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 '+diameter+' '+diameter);
+      visualDiv.appendChild(svg);
+      const center=diameter/2;const radius=diameter/2-60;const pos={};
+      const n=data.length;if(n===0) return;
+      data.forEach((v,i)=>{const ang=2*Math.PI*i/n-Math.PI/2;pos[v]={x:center+radius*Math.cos(ang),y:center+radius*Math.sin(ang)};});
+      edges.forEach(e=>{if(!(e.from in pos)||!(e.to in pos))return;const ln=document.createElementNS('http://www.w3.org/2000/svg','line');ln.setAttribute('x1',pos[e.from].x);ln.setAttribute('y1',pos[e.from].y);ln.setAttribute('x2',pos[e.to].x);ln.setAttribute('y2',pos[e.to].y);ln.setAttribute('stroke',getComputedStyle(document.body).getPropertyValue('--blue-dark'));ln.setAttribute('stroke-width','2');svg.appendChild(ln);});
+      data.forEach(v=>{const d=document.createElement('div');d.className='node';d.style.position='absolute';d.style.left=(pos[v].x-20)+'px';d.style.top=(pos[v].y-20)+'px';d.style.width='40px';d.style.height='40px';d.textContent=v;
+        d.addEventListener('click',()=>{
+          if(!connectMode){return;}
+          if(!selectedForEdge.includes(v)){
+            selectedForEdge.push(v);d.classList.add('highlight');
+          }
+          if(selectedForEdge.length===2){
+            const [a,b]=selectedForEdge;edges.push({from:a,to:b});selectedForEdge.forEach(t=>{const nEl=[...visualDiv.querySelectorAll('.node')].find(x=>x.textContent===t);nEl&&nEl.classList.remove('highlight');});selectedForEdge=[];render();showMsg('Connected '+a+' ↔ '+b);
+          }
+        });
+        visualDiv.appendChild(d);
+      });
+    }
+
+    /* -------- Search with animation ---------- */
+    function searchItem(){const target=document.getElementById('searchInput').value.trim();if(!target)return;const nodes=[...visualDiv.querySelectorAll('.node')];nodes.forEach(n=>n.classList.remove('highlight'));let i=0;const interval=setInterval(()=>{if(i>0)nodes[i-1].classList.remove('highlight');if(i>=nodes.length){clearInterval(interval);showMsg('Value "'+target+'" not found');return;}nodes[i].classList.add('highlight');if(nodes[i].textContent.replace(' (top)','')===target){clearInterval(interval);showMsg('Found "'+target+'"');return;}i++;},600);} 
+
+    function toggleDark(){document.body.classList.toggle('dark');darkToggle.textContent=document.body.classList.contains('dark')?'☀️':'🌙';}
+
+    render();
+  </script>
+</body>
+</html>
